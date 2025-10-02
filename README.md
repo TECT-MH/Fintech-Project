@@ -1,10 +1,12 @@
-# FinCoach AI
+# FinCoach AI  
 
-A modern frontend project built for Fintech applications. This project is structured for scalability, maintainability, and easy integration with backend services.
+A modern frontend project built for Fintech applications. This project is structured for scalability, maintainability, and easy integration with backend services.  
+
+🔗 **Live website:** [FinCoachAI](https://fincoachai.vercel.app/)  
 
 ---
 
-## Folder Structure
+## Folder Structure  
 
 ```text
 Fintech-Project/
