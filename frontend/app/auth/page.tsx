@@ -7,10 +7,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link";
+import { app } from "@/app/firebase/config"; // Import both if needed, but use only 'auth'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Eye, EyeOff, Shield, CheckCircle, XCircle, AlertCircle, ArrowLeft, TrendingUp } from "lucide-react"
+import { auth } from "@/app/firebase/config";
+import { Eye, EyeOff, Shield, CheckCircle, XCircle, AlertCircle, ArrowLeft, TrendingUp } from "lucide-react";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from "firebase/auth";
+// Import your Firebase app initialization (adjust path as needed)
+// const auth = getAuth(app);
 
 interface LoginFormData {
   identifier: string
@@ -87,7 +92,7 @@ export default function AuthPage() {
     const errors: FormErrors = {}
 
     if (!loginData.identifier.trim()) {
-      errors.identifier = "Name or email is required"
+      errors.identifier = "Email is required"
     }
 
     if (!loginData.password) {
@@ -129,70 +134,89 @@ export default function AuthPage() {
 
   // Form submission handlers
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if (!validateLoginForm()) return
+    if (!validateLoginForm()) return;
 
-    setIsLoading(true)
-    setMessage(null)
+    setIsLoading(true);
+    setMessage(null);
+
+    // 💡 Firebase Sign-In requires Email and Password. 
+    // We assume the 'identifier' is the email for this function.
+    const email = loginData.identifier;
+    const password = loginData.password;
 
     try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          identifier: loginData.identifier,
-          password: loginData.password,
-        }),
-      })
+        // 🔑 Use the Firebase signInWithEmailAndPassword function
+        await signInWithEmailAndPassword(auth, email, password);
 
-      const result = await response.json()
+        // Success
+        setMessage({ type: "success", text: "Login successful! Redirecting..." });
+        setLoginData({ identifier: "", password: "" });
+        
+        // 💡 OPTIONAL: Add a redirect here, e.g., router.push('/dashboard')
 
-      if (response.ok) {
-        setMessage({ type: "success", text: result.message || "Login successful!" })
-        setLoginData({ identifier: "", password: "" })
-      } else {
-        setMessage({ type: "error", text: result.message || "Login failed. Please try again." })
-      }
-    } catch (error) {
-      setMessage({ type: "error", text: "Network error. Please check your connection." })
+    } catch (error: any) {
+        // Handle specific Firebase Auth errors
+        console.error("Firebase Login Error:", error.code, error.message);
+
+        let errorMessage = "Login failed. Please check your credentials.";
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+            errorMessage = "Invalid email or password.";
+        }
+        
+        setMessage({ type: "error", text: errorMessage });
     } finally {
-      setIsLoading(false)
+        setIsLoading(false);
     }
   }
 
+
   const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if (!validateSignupForm()) return
+    if (!validateSignupForm()) return;
 
-    setIsLoading(true)
-    setMessage(null)
+    setIsLoading(true);
+    setMessage(null);
+
+    const { email, password, name } = signupData;
 
     try {
-      const response = await fetch("/api/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: signupData.name,
-          email: signupData.email,
-          contact: signupData.contact,
-          password: signupData.password,
-        }),
-      })
+        // 🔑 1. Create the user with email and password
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
 
-      const result = await response.json()
+        // 🔑 2. Update user profile to include the Name (Display Name)
+        if (user) {
+            await updateProfile(user, {
+                displayName: name
+                // You cannot set the contact/phone number here directly.
+                // For phone number (if needed), you would use the Firebase Admin SDK 
+                // on the backend or store it in a Firestore/Realtime Database.
+            });
+        }
 
-      if (response.ok) {
-        setMessage({ type: "success", text: result.message || "Account created successfully!" })
-        setSignupData({ name: "", email: "", contact: "", password: "" })
-      } else {
-        setMessage({ type: "error", text: result.message || "Signup failed. Please try again." })
-      }
-    } catch (error) {
-      setMessage({ type: "error", text: "Network error. Please check your connection." })
+        // Success
+        setMessage({ type: "success", text: "Account created successfully! You are now logged in." });
+        setSignupData({ name: "", email: "", contact: "", password: "" });
+        
+        // 💡 OPTIONAL: Add a redirect here, e.g., router.push('/onboarding')
+
+    } catch (error: any) {
+        // Handle specific Firebase Auth errors
+        console.error("Firebase Signup Error:", error.code, error.message);
+
+        let errorMessage = "Signup failed. Please try again.";
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = "This email is already in use.";
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = "Password is too weak. Please use a stronger password.";
+        }
+
+        setMessage({ type: "error", text: errorMessage });
     } finally {
-      setIsLoading(false)
+        setIsLoading(false);
     }
   }
 
@@ -286,11 +310,11 @@ export default function AuthPage() {
                 <TabsContent value="login" className="space-y-4 mt-6">
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="login-identifier">Name or Email</Label>
+                      <Label htmlFor="login-identifier">Email</Label>
                       <Input
                         id="login-identifier"
                         type="text"
-                        placeholder="Enter your name or email"
+                        placeholder="Enter your email"
                         value={loginData.identifier}
                         onChange={(e) => setLoginData({ ...loginData, identifier: e.target.value })}
                         className={loginErrors.identifier ? "border-destructive" : ""}
