@@ -14,6 +14,7 @@ export default function LandingPage() {
   const [open, setOpen] = useState(false)
   const [supportOpen, setSupportOpen] = useState(false)
   const [termsOpen, setTermsOpen] = useState(false)
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-accent/10">
       {/* Header */}
